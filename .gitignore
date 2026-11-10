@@ -1,0 +1,17 @@
+build/
+install/
+log/
+build-container/
+install-container/
+log-container/
+.venv/
+__pycache__/
+*.pyc
+.container-storage/
+.tools/qgroundcontrol/*.AppImage
+.tools/qgroundcontrol/squashfs-root/
+
+# Local credentials (never commit these)
+githubkey
+githubkey.pub
+
