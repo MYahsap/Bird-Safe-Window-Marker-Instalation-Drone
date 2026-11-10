@@ -1,18 +1,30 @@
 # Holybro X650 PX4 + ROS 2 Gazebo simulation
 
-This repository contains a self-contained Gazebo model of the Holybro X650,
-a PX4 SITL launcher, and a small ROS 2 offboard-control example.
+Simulation and control environment for a Holybro X650 quadrotor equipped with
+a one-degree-of-freedom manipulator and a forward-facing RGB camera.
 
-The model uses the X650's published 650 mm wheelbase. Its 3.2 kg simulated
-mass represents the 2.0 kg frame/electronics kit plus a 6S 10 Ah battery. The
-aerodynamic constants are an initial engineering approximation for 15-inch
-propellers; tune them against logs from your exact motor/propeller/battery
-combination before treating the simulation as a digital twin.
+The project combines:
 
-## Clone the repository
+- PX4 v1.17 software-in-the-loop (SITL)
+- ROS 2 Jazzy and `px4_msgs`
+- Gazebo Harmonic
+- Micro XRCE-DDS Agent
+- A 650 mm X650 model with an asymmetric payload
+- A simulated ST-3215-C018 servo and Cartesian impedance controller
+- A ROS 2 RGB camera bridge
+- An optional STS3215 USB-to-TTL hardware interface
 
-The ROS 2 message definitions and Micro XRCE-DDS Agent are pinned as Git
-submodules. Clone them together with the main repository:
+> [!IMPORTANT]
+> This model is an engineering approximation, not a validated digital twin.
+> Validate propulsion, inertia, controller gains, servo loading, and mechanical
+> clearances before transferring anything to real hardware.
+
+## Quick start
+
+The container workflow is recommended on CachyOS, Arch, and other non-Ubuntu
+hosts. It keeps ROS, Gazebo, and PX4 on the supported Ubuntu 24.04 toolchain.
+
+### 1. Clone the project
 
 ```bash
 git clone --recurse-submodules \
@@ -20,300 +32,269 @@ git clone --recurse-submodules \
 cd Bird-Safe-Window-Marker-Instalation-Drone
 ```
 
-If the repository was cloned without `--recurse-submodules`, initialize the
-dependencies afterward:
+For an existing clone that is missing the dependencies:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-## Supported stack
+### 2. Install a container runtime
 
-- Ubuntu 24.04
-- ROS 2 Jazzy
-- Gazebo Harmonic (`gz sim`)
-- PX4 v1.17.0
-- Micro XRCE-DDS Agent on UDP port 8888
+Install Podman or Docker. On CachyOS or Arch:
 
-Other recent ROS 2/Gazebo releases may work, but the versions above are the
-tested target. PX4 and `px4_msgs` must use matching release branches.
-
-## Recommended setup on CachyOS, Arch, or other non-Ubuntu hosts
-
-ROS 2 Jazzy binary packages target Ubuntu 24.04, and PX4 v1.17's supported
-native toolchain uses the same platform. Use the official PX4 Jazzy/Gazebo
-container instead of mixing rolling-distribution Python packages with the
-PX4 build.
-
-Install either Podman or Docker. On CachyOS/Arch, for example:
-
-```fish
+```bash
 sudo pacman -S podman fuse-overlayfs
 ```
 
-`fuse-overlayfs` is recommended for fast rootless image storage on Btrfs. If
-it is absent, the launcher automatically uses a slower project-local VFS
-store instead of failing with an OverlayFS error. Container data is stored in
-`.container-storage/` and can be removed when you no longer need the image.
-The image reference is fully qualified as `docker.io/px4io/...`, so Podman
-does not require a system-wide unqualified-search registry configuration.
+`fuse-overlayfs` is strongly recommended on Btrfs. Without it, the launcher
+uses a slower project-local VFS store under `.container-storage/`.
 
-Then build and run the project from Fish or any other shell:
+### 3. Build and validate
 
-```fish
+```bash
 ./scripts/container.sh build
 ./scripts/container.sh check
+```
+
+The initial build downloads the PX4 development image, builds PX4 SITL, and
+builds the ROS 2 workspace. Generated files are kept in ignored directories,
+so subsequent builds are incremental.
+
+### 4. Start the simulator
+
+```bash
 ./scripts/container.sh run
 ```
 
-The `build` command must finish successfully before `run`; otherwise ROS 2
-will only see its `/opt/ros/jazzy` underlay and report `x650_sim` as missing.
-Container artifacts use `build-container/`, `install-container/`, and
-`log-container/`, keeping CMake's absolute container paths separate from any
-native build attempted on the host.
+This starts Gazebo with its GUI, PX4 SITL, the XRCE-DDS agent, the manipulator
+controller, and the camera bridge. Stop the simulation with `Ctrl+C`.
 
-Use `./scripts/container.sh headless` when no GUI is needed, or
-`./scripts/container.sh shell` for an interactive Bash shell in the prepared
-environment. The project and PX4 source/build directories are bind-mounted,
-so builds persist when the container exits.
-
-In GUI mode, Gazebo, PX4, and ROS 2 run together in the supported Ubuntu
-container, eliminating cross-container Gazebo discovery problems. Because
-OGRE2 currently fails through native Wayland on this host, the launcher uses
-GNOME's XWayland compatibility display. It mounts the X11 socket and the
-session authorization cookie into the container, and exposes the Intel
-`/dev/dri/renderD128` node. X11 clients can potentially observe desktop input
-or other windows while running, so use this only with the trusted PX4 image and
-stop it with `Ctrl+C` when finished.
-
-## Native Ubuntu 24.04 setup
-
-### 1. Install prerequisites
-
-Install ROS 2 Jazzy and the PX4 Ubuntu toolchain first. Then clone and build
-the dependencies (the script does not use `sudo` or modify system packages):
+For a simulation without the Gazebo GUI:
 
 ```bash
-./scripts/bootstrap.sh
+./scripts/container.sh headless
 ```
 
-By default dependencies are placed next to this repository:
+## Interacting with ROS 2
 
-```text
-../PX4-Autopilot
-ros2_ws/src/px4_msgs
-ros2_ws/src/Micro-XRCE-DDS-Agent
-```
-
-Override the PX4 path with `PX4_AUTOPILOT_PATH`.
-
-The bootstrap script now checks the operating system and PX4 Python modules
-before starting a build. If PX4 dependencies are missing, run the toolchain
-installer path printed by the script.
-
-### 2. Build the ROS 2 workspace
+Keep the simulator running and open another terminal in the repository:
 
 ```bash
-./scripts/build_ros2.sh
-source ros2_ws/install/setup.bash
+./scripts/container.sh shell
 ```
 
-When using Fish, source the Fish environment file—not the Bash file:
-
-```fish
-source ros2_ws/install/setup.fish
-```
-
-### 3. Run
-
-Launch Gazebo, PX4 SITL, and the DDS agent:
-
-```bash
-export PX4_AUTOPILOT_PATH="$PWD/../PX4-Autopilot"
-ros2 launch x650_sim sim.launch.py
-```
-
-### QGroundControl
-
-On the CachyOS host, install the pinned QGroundControl v5.1.4 AppImage into
-the project and launch it with:
-
-```fish
-./scripts/qgroundcontrol.sh install
-./scripts/qgroundcontrol.sh run
-```
-
-The launcher automatically uses AppImage extraction mode if the host has
-FUSE 3 but not `libfuse.so.2`. Because the simulation container uses host
-networking, QGroundControl should discover PX4 on UDP port 14550 without a
-manual communication link. Start the simulation first, then QGroundControl.
-
-In a second terminal, check the bridge:
+Inside the container shell:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-source ros2_ws/install/setup.bash
-ros2 topic echo /fmu/out/vehicle_status_v1
+source ros2_ws/install-container/setup.bash
+ros2 topic list
 ```
 
-Start the demonstration flight only after Gazebo is running and the estimator
-is ready:
+Confirm that PX4 is connected:
+
+```bash
+ros2 topic echo --once /fmu/out/vehicle_status_v1
+```
+
+### Offboard hover example
+
+Wait until Gazebo is running and PX4 has completed estimator initialization,
+then command a 3 m hover:
 
 ```bash
 ros2 run x650_sim offboard_hover --ros-args -p altitude:=3.0
 ```
 
-The node streams a 3 m NED position setpoint, switches to Offboard after one
-second, and arms. Stop it with Ctrl-C; PX4's offboard-loss failsafe then takes
-over. You can also start it with the launcher by setting
-`start_offboard:=true`, but the separate command is safer for debugging.
+The node continuously publishes a NED position setpoint, requests Offboard
+mode, and requests arming until PX4 confirms both transitions. In NED
+coordinates, a negative Z setpoint means upward motion. Stop the node with
+`Ctrl+C`; PX4's offboard-loss failsafe then takes over.
 
-## One-DOF STS3215 manipulator
+The example is intentionally small. Use it as a starting point for a new ROS 2
+node instead of treating it as a complete flight controller.
 
-The model includes an STS3215-sized servo housing 15 cm forward and 10 cm below
-`base_link`, plus a 50 cm, 100 g moving link with a simulated 0.5 kg payload at
-its midpoint. The revolute joint turns about vehicle +Y, so it tilts
-forward/backward in the X-Z plane. Its software range is -180 to +90 degrees,
-and its initial target is -90 degrees.
+## Simulated vehicle
 
-The actuator is modeled as the 12 V ST-3215-C018 variant: 30 kg.cm
-(2.942 N.m) peak/stall torque, 10 kg.cm (0.981 N.m) rated torque, and
-0.222 s/60 degrees no-load speed. The Gazebo controller uses the peak torque
-as its hard limit and includes integral action to remove steady-state sag.
-Thermal limits are not simulated; the 0.5 kg midpoint load requires about
-1.47 N.m while horizontal, which exceeds the physical servo's continuous
-rated torque even though it is below stall torque.
+### X650 airframe and world
 
-The world also contains a 40 m wide, 20 m tall wall centered 20 m in front of
-the takeoff point. It is 0.25 m thick, spans Y=-20..20 m, and rests on Z=0.
+- 650 mm diagonal motor-to-motor wheelbase
+- 3.191 kg base airframe mass before the moving manipulator assembly
+- Four 15-inch-class simulated propellers
+- PX4 `gz_x500` control-allocation baseline adapted to the X650 geometry
+- Spawn pose: `x=0`, `y=0`, `z=0.25 m`
+- A 40 m wide, 20 m tall wall centered 20 m in front of the vehicle
+- A directional light directly above the world origin
 
-## Fixed RGB camera
+The aerodynamic coefficients are starting estimates. Tune them only against
+measured motor, propeller, battery, and flight-log data.
 
-The drone has a fixed forward-facing RGB camera attached to `base_link` at
-`x=0.14 m`, `z=0.02 m`. It renders 640x480 RGB images at 30 FPS with a
-90-degree horizontal field of view. The camera bridge starts automatically and
-publishes standard ROS 2 messages on:
+### One-DOF manipulator
+
+The manipulator pivot is 15 cm forward and 10 cm below `base_link`. Its 50 cm
+moving link rotates about vehicle +Y, producing motion in the vehicle X-Z
+plane. The moving assembly is modeled as 0.60 kg, including the 0.50 kg
+mid-link payload.
+
+| Property | Value |
+| --- | --- |
+| Joint range | -180° to +90° |
+| Initial/forward angle | -90° |
+| Link length | 0.50 m |
+| Servo model | 12 V ST-3215-C018 |
+| Peak/stall torque | 2.942 N·m (30 kg·cm) |
+| Rated torque | 0.981 N·m (10 kg·cm) |
+| No-load speed | 0.222 s/60° |
+
+The horizontal arm requires approximately 1.47 N·m for the midpoint load.
+That is below stall torque but above the physical servo's continuous rated
+torque. Gazebo does not simulate winding temperature or servo damage.
+
+The extended negative joint range can also sweep the arm toward the airframe
+or propellers. Intra-model collision is disabled in the simulation, so confirm
+real mechanical clearance independently.
+
+### Cartesian impedance control
+
+The controller applies a spring-damper force in the arm's X-Z plane:
 
 ```text
-/x650/camera/image_raw       sensor_msgs/msg/Image
-/x650/camera/camera_info     sensor_msgs/msg/CameraInfo
+F = K (p_target - p) - D v
+tau = J(q)^T F + gravity compensation
 ```
 
-Check the stream from a second container shell:
+Default stiffness is 40 N/m per axis, default damping is 5 N·s/m per axis,
+and output is limited to 2.942 N·m. Because the arm has one DOF, the Jacobian
+can apply only the component of Cartesian force tangent to its circular
+workspace.
 
-```bash
-source /opt/ros/jazzy/setup.bash
-source ros2_ws/install-container/setup.bash
-ros2 topic hz /x650/camera/image_raw
-ros2 topic echo --once /x650/camera/camera_info
-```
-
-Record camera data with:
-
-```bash
-ros2 bag record /x650/camera/image_raw /x650/camera/camera_info
-```
-
-The simulation controller starts automatically and implements Cartesian
-impedance in the arm's X-Z plane. It computes
-`F = K (p_target - p) - D v`, maps that force to the revolute joint with
-`tau = J(q)^T F`, adds gravity compensation, and limits output to the
-ST-3215-C018 peak torque of 2.942 N.m. Default gains are 40 N/m stiffness and
-5 N.s/m damping on both X and Z. Coordinates are relative to `base_link`.
-
-Forward stabilization is enabled by default. The controller subscribes to
-PX4 attitude on `/fmu/out/vehicle_attitude`, extracts vehicle pitch, and uses:
+Forward stabilization is enabled by default. The controller uses PX4 pitch to
+command:
 
 ```text
 joint_target = -pi/2 + vehicle_pitch
 ```
 
-This rotates the arm opposite the vehicle's pitch so it remains horizontal
-and forward relative to the world. The arm has only one DOF, so it cannot
-compensate vehicle roll or independently control world yaw. Also, forward is
-the -90 degree forward reference is centered inside the compensation range:
-vehicle pitch from -90 to +90 degrees can be cancelled with joint targets from
--180 to 0 degrees. Commands outside the configured range are still clamped and
-produce a warning.
+This compensates pitch so the arm remains forward with respect to the world.
+One joint cannot compensate vehicle roll or independently control world yaw.
 
-The extended negative range can sweep the physical arm toward the airframe and
-propeller plane. Gazebo has intra-model self-collision disabled; verify real
-mechanical clearance before enabling this range on hardware.
-
-Inspect the compensated command with:
+Monitor the manipulator:
 
 ```bash
+ros2 topic echo /x650/manipulator/joint_state
+ros2 topic echo /x650/manipulator/tip_position
+ros2 topic echo /x650/manipulator/commanded_torque
 ros2 topic echo /x650/manipulator/stabilized_angle
 ```
 
-Disable stabilization when manually commanding Cartesian or angle targets:
+`joint_state` is the measured joint angle relative to the vehicle. The
+`stabilized_angle` topic is the pitch-compensated command. Comparing these with
+`/fmu/out/vehicle_attitude` shows how the joint behaves relative to the world.
+
+To command the arm manually, restart the launch with stabilization disabled:
 
 ```bash
 ros2 launch x650_sim sim.launch.py manipulator_stabilize_forward:=false
 ```
 
-With stabilization disabled, command a Cartesian tip target from a second
-container shell:
+Command a Cartesian tip target relative to `base_link`:
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-source ros2_ws/install-container/setup.bash
-
 ros2 topic pub --once /x650/manipulator/cartesian_target \
   geometry_msgs/msg/Point '{x: 0.50, y: 0.0, z: -0.35}'
 ```
 
-Because the arm has one DOF, it can only generate force tangent to its circular
-workspace; the Jacobian projects an arbitrary X-Z target onto that available
-direction. The legacy angle topic remains available and is converted to a
-Cartesian point on the 0.5 m workspace circle:
+Or command a joint angle in radians:
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-source ros2_ws/install-container/setup.bash
-
-ros2 topic pub --once /x650/manipulator/angle std_msgs/msg/Float64 '{data: 0.785398}'
-ros2 topic pub --once /x650/manipulator/angle std_msgs/msg/Float64 '{data: 0.0}'
-ros2 topic pub --once /x650/manipulator/angle std_msgs/msg/Float64 '{data: -0.785398}'
+ros2 topic pub --once /x650/manipulator/angle \
+  std_msgs/msg/Float64 '{data: -1.570796}'
 ```
 
-Those commands request +45, 0, and -45 degrees. Change the joint's `<axis>` in
-`models/x650/model.sdf` if the intended physical tilt axis is different.
-
-Controller feedback is available for plotting and rosbag logging:
-
-```text
-/x650/manipulator/joint_state        sensor_msgs/msg/JointState
-/x650/manipulator/tip_position       geometry_msgs/msg/PointStamped
-/x650/manipulator/commanded_torque   std_msgs/msg/Float64
-/x650/manipulator/stabilized_angle   std_msgs/msg/Float64
-```
-
-Tune compliance through launch arguments, for example:
+Tune compliance at launch time:
 
 ```bash
 ros2 launch x650_sim sim.launch.py \
-  manipulator_stiffness_x:=25.0 manipulator_stiffness_z:=25.0 \
-  manipulator_damping_x:=4.0 manipulator_damping_z:=4.0
+  manipulator_stiffness_x:=25.0 \
+  manipulator_stiffness_z:=25.0 \
+  manipulator_damping_x:=4.0 \
+  manipulator_damping_z:=4.0
 ```
 
-Keep stiffness low enough that normal Cartesian errors do not continuously
-saturate the 2.942 N.m torque limit. State loss commands zero torque after
-2 seconds. The timeout tolerates Gazebo running well below real time while
-still removing actuator effort when feedback is lost.
+Keep stiffness low enough to avoid continuously saturating the torque limit.
+The controller removes actuator effort if Gazebo joint feedback is absent for
+more than two seconds.
 
-For the physical servo, first identify the adapter using a stable path under
-`/dev/serial/by-id/`. Pass it into a container:
+### RGB camera
+
+The fixed camera is 14 cm forward and 2 cm above `base_link`. It produces
+640×480 RGB images at 30 FPS with a 90° horizontal field of view.
+
+| ROS 2 topic | Message |
+| --- | --- |
+| `/x650/camera/image_raw` | `sensor_msgs/msg/Image` |
+| `/x650/camera/camera_info` | `sensor_msgs/msg/CameraInfo` |
+
+Check the stream:
 
 ```bash
-X650_SERIAL_DEVICE=/dev/serial/by-id/YOUR_ADAPTER ./scripts/container.sh shell
+ros2 topic hz /x650/camera/image_raw
+ros2 topic echo --once /x650/camera/camera_info
 ```
 
-Inside that shell, start the hardware driver (factory defaults shown):
+## QGroundControl
+
+Install the pinned QGroundControl AppImage once, then run it on the host:
+
+```bash
+./scripts/qgroundcontrol.sh install
+./scripts/qgroundcontrol.sh run
+```
+
+Start the simulation first. Because the container uses host networking,
+QGroundControl should discover PX4 automatically on UDP port 14550.
+
+## Data logging
+
+Record the main ROS 2 data streams from a container shell:
+
+```bash
+ros2 bag record \
+  /fmu/out/vehicle_attitude \
+  /fmu/out/vehicle_local_position \
+  /x650/manipulator/joint_state \
+  /x650/manipulator/tip_position \
+  /x650/manipulator/commanded_torque \
+  /x650/camera/image_raw \
+  /x650/camera/camera_info
+```
+
+ROS bag directories and `.db3`/`.mcap` files are ignored by Git. Camera data
+is large; omit the image topic when it is not needed.
+
+PX4 also produces ULog flight logs under its SITL root filesystem. Use those
+logs to compare setpoints and responses before changing PX4 gains.
+
+## Physical STS3215 interface
+
+The hardware path sends position commands through a single-wire half-duplex
+TTL adapter. It does **not** provide true hardware impedance control because
+the current implementation does not enable validated current/torque feedback.
+
+Find the adapter's stable device path and pass it into the container:
+
+```bash
+ls -l /dev/serial/by-id/
+X650_SERIAL_DEVICE=/dev/serial/by-id/YOUR_ADAPTER \
+  ./scripts/container.sh shell
+```
+
+Inside the container:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 source ros2_ws/install-container/setup.bash
+
 ros2 run x650_sim manipulator_controller --ros-args \
   -p mode:=hardware \
   -p port:=/dev/ttyUSB0 \
@@ -323,79 +304,122 @@ ros2 run x650_sim manipulator_controller --ros-args \
   -p direction:=1
 ```
 
-Use the resolved device printed by `readlink -f /dev/serial/by-id/YOUR_ADAPTER`
-as the `port` value if it is not `/dev/ttyUSB0`. Publish angles from another
-ROS container as above. Set `direction:=-1` if positive motion is reversed.
-Hardware mode remains position-only: true impedance requires validated
-bidirectional position/velocity feedback and torque or current control, which
-the current minimal STS3215 serial protocol intentionally does not enable.
-Forward pitch stabilization does operate in hardware mode by sending the
-compensated position target at up to 20 Hz, provided the PX4 attitude topic is
-available through the ROS 2 bridge.
+Use the device returned by `readlink -f /dev/serial/by-id/YOUR_ADAPTER` if it
+is not `/dev/ttyUSB0`. Set `direction:=-1` if positive motion is reversed.
 
-The adapter must support the STS3215 single-wire half-duplex TTL bus. For the
-ST-3215-C018, use a suitable 12 V supply capable of handling its 2.7 A stall
-current, and connect the adapter and supply grounds together. Do not power the
-servo motor from the USB data adapter.
+> [!WARNING]
+> Use a suitable 12 V supply capable of the servo's 2.7 A stall current. Join
+> the adapter and supply grounds, and do not power the servo motor from the USB
+> adapter.
 
-Useful launch options:
+## Launch options
+
+When launching directly inside a prepared ROS 2 environment:
 
 ```bash
 ros2 launch x650_sim sim.launch.py headless:=true
 ros2 launch x650_sim sim.launch.py start_agent:=false
+ros2 launch x650_sim sim.launch.py start_offboard:=true
+ros2 launch x650_sim sim.launch.py start_manipulator:=false
+ros2 launch x650_sim sim.launch.py start_camera_bridge:=false
 ros2 launch x650_sim sim.launch.py spawn_pose:="0,0,0.25,0,0,0"
 ```
 
-## Layout
+Run `ros2 launch x650_sim sim.launch.py --show-args` for the complete list.
 
-```text
-models/x650/                  Gazebo SDF model
-worlds/x650_world.sdf         Flat test world
-ros2_ws/src/x650_sim/         ROS 2 package and launcher
-scripts/bootstrap.sh          Dependency/build helper
-scripts/build_ros2.sh         Guarded ROS 2 workspace builder
-scripts/container.sh          CachyOS/Arch container entry point
-scripts/validate.sh           Offline structural checks
+## Native Ubuntu 24.04 setup
+
+The container path is preferred. For a native installation, first install ROS
+2 Jazzy and the PX4 Ubuntu development toolchain, then run:
+
+```bash
+./scripts/bootstrap.sh
+./scripts/build_ros2.sh
+source ros2_ws/install/setup.bash
+export PX4_AUTOPILOT_PATH="$PWD/../PX4-Autopilot"
+ros2 launch x650_sim sim.launch.py
 ```
 
-## Notes
+Fish users must source `ros2_ws/install/setup.fish`, not the Bash setup file.
+The `PX4_AUTOPILOT_PATH` variable can point to a PX4 checkout elsewhere.
 
-- The ROS/PX4 position setpoint is NED: negative Z means upward.
-- PX4's SITL client connects to the XRCE agent at `127.0.0.1:8888`.
-- The launcher starts the custom world by absolute path and runs PX4 with
-  `PX4_GZ_STANDALONE=1`; PX4 v1.17 otherwise searches only its in-tree world
-  directory when it starts Gazebo itself.
-- DDS is unauthenticated. Keep port 8888 and ROS discovery local to the
-  development machine.
-- To tune flight behavior, start with `MC_MOT_THST_EXPO`, `MPC_THR_HOVER`, and
-  the multicopter rate gains, then adjust the SDF motor constants only when
-  matching measured propulsion data.
+## Troubleshooting
+
+### `Package 'x650_sim' not found`
+
+Build first and source the matching install tree:
+
+```bash
+./scripts/container.sh build
+source ros2_ws/install-container/setup.bash
+```
+
+Use `install-container` inside the project container and `install` only for a
+native build.
+
+### PX4 waits for or times out on the Gazebo world
+
+Start the complete stack with `./scripts/container.sh run` or `headless`.
+Starting PX4 separately before the custom Gazebo world is available causes the
+`Waiting for Gazebo world` timeout.
+
+### Gazebo GUI does not appear
+
+Run the command from a terminal opened in the active graphical desktop
+session. GUI mode requires `DISPLAY`, `XAUTHORITY`, the X11 socket, and access
+to `/dev/dri/renderD128`. Use `./scripts/container.sh headless` if no graphical
+session is available.
+
+### Podman fails on Btrfs OverlayFS
+
+Install `fuse-overlayfs`. The launcher otherwise falls back to project-local
+VFS storage, which works but consumes substantially more disk space.
+
+### Fish reports errors while sourcing `setup.bash`
+
+Do not source Bash setup scripts from Fish. Use the generated `setup.fish`, or
+enter `./scripts/container.sh shell`, which starts Bash.
 
 ## PX4 controller baseline
 
-The launcher explicitly restores PX4 v1.17's multicopter attitude, rate, and
-position gains plus the proven gz_x500 control-allocation geometry. Explicit
-startup values are necessary because experimental values may already have
-been saved in `parameters.bson`.
+The launch file restores PX4 v1.17 multicopter attitude, rate, and position
+defaults and applies the proven `gz_x500` allocation layout. These startup
+overrides prevent experimental values saved in `parameters.bson` from making
+takeoff unstable.
 
-Do not copy Gazebo SDF rotor Y positions directly into `CA_ROTOR*_PY`: Gazebo
-model poses use FLU body coordinates while PX4's allocator uses FRD, so Y must
-change sign. An earlier experimental preset missed that conversion and could
-turn roll stabilization into positive feedback during takeoff. This baseline
-prioritizes a stable takeoff; further load compensation must be based on ULog
-setpoint-versus-response data.
+PX4 allocation uses forward-right-down coordinates, while Gazebo model poses
+use forward-left-up coordinates. The rotor Y signs must therefore be inverted;
+copying them directly from SDF can turn roll stabilization into positive
+feedback.
 
-To inspect the values after PX4 starts:
+Do not copy SITL gains directly to the physical X650. Tune one axis at a time
+using PX4 ULog setpoint-versus-response data.
 
-```bash
-px4-param show MC_PITCHRATE_I
-px4-param show MC_PITCHRATE_D
-px4-param show MPC_XY_P
-px4-param show MPC_Z_P
-px4-param show CA_ROTOR0_PX
+## Project layout
+
+```text
+models/x650/                       Gazebo X650 model
+worlds/x650_world.sdf              Test world and wall
+ros2_ws/src/x650_sim/              ROS 2 package, nodes, and launcher
+ros2_ws/src/px4_msgs/              PX4 message submodule
+ros2_ws/src/Micro-XRCE-DDS-Agent/  DDS agent submodule
+scripts/bootstrap.sh               PX4/native dependency bootstrap
+scripts/build_ros2.sh              ROS 2 workspace build helper
+scripts/container.sh               Podman/Docker entry point
+scripts/qgroundcontrol.sh          QGroundControl installer/launcher
+scripts/validate.sh                Offline structural validation
 ```
 
-Run one axis at a time and compare setpoint versus response in the PX4 ULog
-before changing gains. Do not copy SITL gains directly to the physical X650.
+Run the offline checks after editing the model, launch file, or ROS nodes:
 
-# Bird-Safe-Window-Marker-Instalation-Drone
+```bash
+./scripts/validate.sh
+```
+
+## Security notes
+
+- XRCE-DDS and local ROS discovery are unauthenticated; keep them on the
+  development machine or a trusted network.
+- GUI containers receive access to the desktop X11 socket. Use only trusted
+  images and stop the container when finished.
+- Never commit SSH keys, serial-device credentials, flight logs, or ROS bags.
