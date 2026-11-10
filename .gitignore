@@ -11,6 +11,17 @@ __pycache__/
 .tools/qgroundcontrol/*.AppImage
 .tools/qgroundcontrol/squashfs-root/
 
+# ROS 2 bag recordings and runtime data
+rosbag2_*/
+*.db3
+*.mcap
+
+# Local editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+*~
+
 # Local credentials (never commit these)
 githubkey
 githubkey.pub

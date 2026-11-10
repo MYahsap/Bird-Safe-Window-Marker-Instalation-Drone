@@ -9,6 +9,24 @@ aerodynamic constants are an initial engineering approximation for 15-inch
 propellers; tune them against logs from your exact motor/propeller/battery
 combination before treating the simulation as a digital twin.
 
+## Clone the repository
+
+The ROS 2 message definitions and Micro XRCE-DDS Agent are pinned as Git
+submodules. Clone them together with the main repository:
+
+```bash
+git clone --recurse-submodules \
+  git@github.com:MYahsap/Bird-Safe-Window-Marker-Instalation-Drone.git
+cd Bird-Safe-Window-Marker-Instalation-Drone
+```
+
+If the repository was cloned without `--recurse-submodules`, initialize the
+dependencies afterward:
+
+```bash
+git submodule update --init --recursive
+```
+
 ## Supported stack
 
 - Ubuntu 24.04
