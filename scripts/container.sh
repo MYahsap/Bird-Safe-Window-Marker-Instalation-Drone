@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 px4_path="${PX4_AUTOPILOT_PATH:-$(dirname "$repo_root")/PX4-Autopilot}"
 image="${X650_CONTAINER_IMAGE:-docker.io/px4io/px4-dev-ros2-gazebo:main-jazzy}"
+container_platform="${X650_CONTAINER_PLATFORM:-}"
 gz_partition="${X650_GZ_PARTITION:-x650_sim}"
 host_display="${DISPLAY:-}"
 host_xauthority="${XAUTHORITY:-}"
@@ -68,6 +69,9 @@ run_args=(
   -v "$px4_path:/workspace/PX4-Autopilot:rw"
   -w /workspace/sims
 )
+if [[ -n "$container_platform" ]]; then
+  run_args+=(--platform "$container_platform")
+fi
 
 # Optional physical STS3215 adapter passthrough. Leave unset for simulation.
 serial_device="${X650_SERIAL_DEVICE:-}"

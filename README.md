@@ -96,6 +96,162 @@ For a simulation without the Gazebo GUI:
 ./scripts/container.sh headless
 ```
 
+## Platform installation guides
+
+The project always runs a Linux PX4/ROS/Gazebo environment. Linux hosts run
+that container directly; Windows and macOS run it inside Docker Desktop's Linux
+VM. ROS 2 Jazzy's binary packages target Ubuntu 24.04, so Debian, Windows, and
+macOS should use the container workflow instead of attempting a native ROS/PX4
+installation.
+
+| Host | Recommended runtime | Gazebo GUI | Headless simulation |
+| --- | --- | --- | --- |
+| Debian Linux | Podman | Supported on a compatible X11/XWayland session | Supported |
+| Windows 10/11 | Docker Desktop with WSL 2 | Not supported by the current launcher | Supported |
+| macOS | Docker Desktop | Not supported by the current launcher | Supported |
+
+Docker Desktop must have **host networking** enabled because PX4, Gazebo, the
+DDS agent, ROS 2 shells, and QGroundControl communicate over host UDP. Docker
+documents this as an opt-in feature in Desktop 4.34 and newer under
+**Settings → Resources → Network → Enable host networking**.
+
+### Windows 10/11 with WSL 2
+
+1. Open an administrator PowerShell terminal, install or update WSL, and
+   restart when requested:
+
+   ```powershell
+   wsl --install
+   wsl --update
+   ```
+
+2. Install [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/)
+   with the WSL 2 backend. In Docker Desktop, enable integration for the Ubuntu
+   WSL distribution and enable host networking.
+
+3. Open the Ubuntu/WSL terminal. Keep the repository in the Linux filesystem
+   under your home directory rather than under `/mnt/c`; this gives container
+   builds Linux permissions and substantially better filesystem performance.
+
+   ```bash
+   sudo apt update
+   sudo apt install -y git
+
+   cd ~
+   git clone --recurse-submodules \
+     https://github.com/MYahsap/Bird-Safe-Window-Marker-Instalation-Drone.git
+   cd Bird-Safe-Window-Marker-Instalation-Drone
+   docker version
+   ```
+
+4. Build, validate, and start headless mode:
+
+   ```bash
+   ./scripts/container.sh build
+   ./scripts/container.sh check
+   ./scripts/container.sh headless
+   ```
+
+Run ROS 2 commands from a second WSL terminal with
+`./scripts/container.sh shell`. WSLg can run ordinary Linux GUI applications,
+but the project's Gazebo launcher additionally expects Linux X11 authorization
+and `/dev/dri` device passthrough; use headless mode on Windows for now.
+
+On a Windows-on-ARM computer, the published simulation image still uses the
+`amd64` architecture. Enable x86-64 emulation in Docker Desktop and set:
+
+```bash
+export X650_CONTAINER_PLATFORM=linux/amd64
+```
+
+Install QGroundControl as a native Windows application rather than running the
+project's Linux AppImage helper.
+
+### macOS
+
+1. Install [Docker Desktop for Mac](https://docs.docker.com/desktop/setup/install/mac-install/)
+   for the correct processor: Apple silicon or Intel. Enable host networking
+   in Docker Desktop settings.
+
+2. Install Apple's command-line developer tools if `git` is unavailable:
+
+   ```bash
+   xcode-select --install
+   ```
+
+3. Clone and build from Terminal:
+
+   ```bash
+   git clone --recurse-submodules \
+     https://github.com/MYahsap/Bird-Safe-Window-Marker-Instalation-Drone.git
+   cd Bird-Safe-Window-Marker-Instalation-Drone
+
+   ./scripts/container.sh build
+   ./scripts/container.sh check
+   ./scripts/container.sh headless
+   ```
+
+The published PX4 simulation image is built for `linux/amd64`. On Apple
+silicon, install Rosetta when prompted and set the platform before building:
+
+```bash
+softwareupdate --install-rosetta
+export X650_CONTAINER_PLATFORM=linux/amd64
+./scripts/container.sh build
+```
+
+Emulation is slower than running on an Intel/AMD Linux host. The current GUI
+launcher mounts Linux X11 sockets and Linux GPU render devices, neither of
+which Docker Desktop exposes in the same form on macOS. Use `headless`, and
+install QGroundControl as a native macOS application.
+
+### Debian Linux
+
+Debian 11 and later provide Podman in the distribution repositories. Install
+Podman, Git, and `fuse-overlayfs`:
+
+```bash
+sudo apt update
+sudo apt install -y git podman fuse-overlayfs
+podman info
+```
+
+Clone, build, and validate:
+
+```bash
+git clone --recurse-submodules \
+  https://github.com/MYahsap/Bird-Safe-Window-Marker-Instalation-Drone.git
+cd Bird-Safe-Window-Marker-Instalation-Drone
+
+./scripts/container.sh build
+./scripts/container.sh check
+```
+
+Start the GUI from a terminal inside the active X11/XWayland desktop session:
+
+```bash
+./scripts/container.sh run
+```
+
+The GUI requires `DISPLAY`, a valid `XAUTHORITY` file, `/tmp/.X11-unix`, and
+access to a `/dev/dri/renderD*` device. If any of those are unavailable, use:
+
+```bash
+./scripts/container.sh headless
+```
+
+Do not install Ubuntu ROS 2 binary packages directly on Debian. The container
+already provides the matching Ubuntu 24.04, ROS 2 Jazzy, Gazebo Harmonic, and
+PX4 toolchain.
+
+Official platform references:
+
+- [Install WSL and Ubuntu](https://learn.microsoft.com/windows/wsl/install/)
+- [Run Linux GUI applications with WSLg](https://learn.microsoft.com/windows/wsl/tutorials/gui-apps)
+- [Docker Desktop host networking](https://docs.docker.com/engine/network/drivers/host/)
+- [Install Podman on Debian](https://podman.io/docs/installation)
+- [Install ROS 2 Jazzy on Ubuntu 24.04](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)
+
 ## Interacting with ROS 2
 
 Keep the simulator running and open another terminal in the repository:
