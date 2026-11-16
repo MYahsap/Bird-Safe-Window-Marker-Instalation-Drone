@@ -11,6 +11,12 @@ import sys
 import xml.etree.ElementTree as ET
 
 root = pathlib.Path(sys.argv[1])
+bootstrap_source = (root / "scripts/bootstrap.sh").read_text()
+assert '[[ -e "$checkout_path/.git" ]]' in bootstrap_source
+assert 'is_git_checkout "$px4_msgs_path"' in bootstrap_source
+assert 'is_git_checkout "$agent_path"' in bootstrap_source
+print("Bootstrap Git checks OK: normal clones and submodule gitfiles supported")
+
 xml_files = [
     root / "models/x650/model.config",
     root / "models/x650/model.sdf",

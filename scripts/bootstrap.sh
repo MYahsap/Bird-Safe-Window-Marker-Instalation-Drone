@@ -8,6 +8,15 @@ px4_msgs_path="$repo_root/ros2_ws/src/px4_msgs"
 
 command -v git >/dev/null || { echo "git is required" >&2; exit 1; }
 
+# A normal clone stores .git as a directory, while a Git submodule stores it
+# as a text file pointing into the parent repository's module database. Accept
+# both forms and verify that Git can actually use the checkout.
+is_git_checkout() {
+  local checkout_path="$1"
+  [[ -e "$checkout_path/.git" ]] \
+    && git -C "$checkout_path" rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
 source /etc/os-release
 if [[ "${ID:-}" != "ubuntu" && "${X650_ALLOW_UNSUPPORTED_HOST:-0}" != "1" ]]; then
   cat >&2 <<EOF
@@ -25,17 +34,17 @@ EOF
   exit 2
 fi
 
-if [[ ! -d "$px4_path/.git" ]]; then
+if ! is_git_checkout "$px4_path"; then
   git clone --recursive --branch v1.17.0 --depth 1 \
     https://github.com/PX4/PX4-Autopilot.git "$px4_path"
 fi
 
-if [[ ! -d "$px4_msgs_path/.git" ]]; then
+if ! is_git_checkout "$px4_msgs_path"; then
   git clone --branch release/1.17 --depth 1 \
     https://github.com/PX4/px4_msgs.git "$px4_msgs_path"
 fi
 
-if ! command -v MicroXRCEAgent >/dev/null && [[ ! -d "$agent_path/.git" ]]; then
+if ! command -v MicroXRCEAgent >/dev/null && ! is_git_checkout "$agent_path"; then
   git clone --recursive --branch v2.4.3 --depth 1 \
     https://github.com/eProsima/Micro-XRCE-DDS-Agent.git "$agent_path"
 fi

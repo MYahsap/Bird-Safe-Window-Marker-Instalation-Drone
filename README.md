@@ -38,6 +38,11 @@ For an existing clone that is missing the dependencies:
 git submodule update --init --recursive
 ```
 
+The bootstrap script recognizes both standalone Git clones and the `.git`
+pointer files used by submodules. If an older checkout reports that
+`ros2_ws/src/px4_msgs` already exists, pull the latest changes, initialize the
+submodules as above, and rerun the build.
+
 ### 2. Install a container runtime
 
 Install Podman or Docker. On CachyOS or Arch:
