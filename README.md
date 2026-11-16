@@ -49,6 +49,22 @@ sudo pacman -S podman fuse-overlayfs
 `fuse-overlayfs` is strongly recommended on Btrfs. Without it, the launcher
 uses a slower project-local VFS store under `.container-storage/`.
 
+The repository also publishes its pinned PX4/ROS/Gazebo environment to GitHub
+Container Registry. After the `Publish simulation container` workflow has
+completed, use it instead of the upstream image with:
+
+```bash
+podman pull ghcr.io/myahsap/bird-safe-window-marker-instalation-drone:jazzy
+
+X650_CONTAINER_IMAGE=ghcr.io/myahsap/bird-safe-window-marker-instalation-drone:jazzy \
+  ./scripts/container.sh build
+```
+
+The image contains the development environment; project source, PX4 source,
+and generated builds remain bind-mounted so edits persist on the host. GitHub
+packages are private by default. If anonymous pulls are required, change the
+package visibility to public in the repository's package settings.
+
 ### 3. Build and validate
 
 ```bash
@@ -113,6 +129,67 @@ coordinates, a negative Z setpoint means upward motion. Stop the node with
 
 The example is intentionally small. Use it as a starting point for a new ROS 2
 node instead of treating it as a complete flight controller.
+
+### Coordinated end-effector pose control
+
+The `end_effector_controller` lets you specify where the end of the arm should
+be and which direction it should face. It solves the arm geometry and commands
+the drone position, drone yaw, and joint angle together so that the tool pose
+remains constrained in the Gazebo `world` frame.
+
+Rebuild after adding or changing ROS 2 nodes:
+
+```bash
+./scripts/container.sh build
+```
+
+Start the coordinated controller in simulation:
+
+```bash
+./scripts/container.sh run \
+  start_end_effector_control:=true \
+  end_effector_auto_arm:=true
+```
+
+`end_effector_auto_arm` defaults to `false`. Set it to `true` only when the
+simulation is clear for immediate autonomous movement. When coordinated
+control is enabled, the launcher automatically disables the manipulator's
+forward-only stabilizer and suppresses the conflicting hover example.
+
+From a second container shell, publish a world-frame target. This example
+places the tool tip at `(4, 0, 2)` metres and faces it horizontally along world
+`+X`:
+
+```bash
+ros2 topic pub --once /x650/end_effector/target_pose \
+  geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: world}, pose: {position: {x: 4.0, y: 0.0, z: 2.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}"
+```
+
+The orientation's local `+X` axis is the tool-facing direction. For example,
+to face world `+Y` while holding the same position, use a +90° yaw quaternion:
+
+```bash
+ros2 topic pub --once /x650/end_effector/target_pose \
+  geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: world}, pose: {position: {x: 4.0, y: 0.0, z: 2.0}, orientation: {x: 0.0, y: 0.0, z: 0.707107, w: 0.707107}}}"
+```
+
+The controller supports tool yaw and elevation. Rotation about the tool's own
+axis is ignored because the arm has only one actuated joint. Targets above
+±80° elevation, outside the joint limits, or requiring the drone base below
+0.25 m are rejected.
+
+Monitor the solved drone pose and joint command:
+
+```bash
+ros2 topic echo /x650/end_effector/base_setpoint
+ros2 topic echo /x650/end_effector/joint_setpoint
+ros2 topic echo /x650/manipulator/joint_state
+```
+
+The target uses Gazebo world coordinates: X is North/forward, Y is West/left,
+and Z is up. The controller converts these setpoints to PX4's NED convention.
 
 ## Simulated vehicle
 

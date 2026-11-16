@@ -93,6 +93,44 @@ assert "self.forward_joint_angle + self.pitch_compensation_gain * pitch" in cont
 assert '"/fmu/out/vehicle_attitude"' in controller_source
 print("Manipulator geometry OK: pivot at x=0.15 m, z=-0.10 m")
 
+sys.path.insert(0, str(root / "ros2_ws/src/x650_sim"))
+from x650_sim.end_effector_kinematics import (
+    base_for_configuration,
+    solve_constraint,
+    tool_direction,
+)
+
+target = (4.0, 2.0, 3.0)
+direction = tool_direction((0.0, 0.0, 0.0, 1.0))
+base, joint, yaw, elevation = solve_constraint(
+    target, direction, pivot_x=0.15, pivot_z=-0.10, arm_length=0.50
+)
+assert all(abs(a - b) < 1e-9 for a, b in zip(direction, (1.0, 0.0, 0.0)))
+assert all(abs(a - b) < 1e-9 for a, b in zip(base, (3.35, 2.0, 3.10)))
+assert abs(joint + math.pi / 2.0) < 1e-9
+assert abs(yaw) < 1e-9 and abs(elevation) < 1e-9
+
+half_yaw = math.pi / 4.0
+direction = tool_direction((0.0, 0.0, math.sin(half_yaw), math.cos(half_yaw)))
+base, joint, yaw, elevation = solve_constraint(
+    target, direction, pivot_x=0.15, pivot_z=-0.10, arm_length=0.50
+)
+assert all(abs(a - b) < 1e-9 for a, b in zip(direction, (0.0, 1.0, 0.0)))
+assert all(abs(a - b) < 1e-9 for a, b in zip(base, (4.0, 1.35, 3.10)))
+assert abs(yaw - math.pi / 2.0) < 1e-9
+measured_base, measured_direction = base_for_configuration(
+    target,
+    vehicle_yaw=math.pi / 2.0,
+    vehicle_pitch=0.0,
+    joint_angle=-math.pi / 2.0,
+    pivot_x=0.15,
+    pivot_z=-0.10,
+    arm_length=0.50,
+)
+assert all(abs(a - b) < 1e-9 for a, b in zip(measured_base, base))
+assert all(abs(a - b) < 1e-9 for a, b in zip(measured_direction, direction))
+print("End-effector kinematics OK: world pose resolves to base and joint targets")
+
 launch_source = (root / "ros2_ws/src/x650_sim/launch/sim.launch.py").read_text()
 expected_tuning = {
     '"PX4_PARAM_CA_ROTOR0_PX": "0.13"',
@@ -105,6 +143,8 @@ expected_tuning = {
 }
 missing_tuning = sorted(value for value in expected_tuning if value not in launch_source)
 assert not missing_tuning, missing_tuning
+assert '"start_end_effector_control"' in launch_source
+assert 'executable="end_effector_controller"' in launch_source
 print("PX4 baseline OK: FRD allocation signs and default gains restored")
 PY
 

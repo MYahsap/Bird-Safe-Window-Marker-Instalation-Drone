@@ -1,0 +1,43 @@
+name: Publish simulation container
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Containerfile
+      - .containerignore
+      - .dockerignore
+      - .github/workflows/publish-container.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/myahsap/bird-safe-window-marker-instalation-drone
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build image
+        run: |
+          docker build \
+            --file Containerfile \
+            --tag "$IMAGE_NAME:jazzy" \
+            --tag "$IMAGE_NAME:$GITHUB_SHA" \
+            .
+
+      - name: Push image
+        run: |
+          docker push "$IMAGE_NAME:jazzy"
+          docker push "$IMAGE_NAME:$GITHUB_SHA"

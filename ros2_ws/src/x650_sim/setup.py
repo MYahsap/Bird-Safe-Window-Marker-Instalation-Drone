@@ -35,6 +35,7 @@ setup(
     entry_points={
         "console_scripts": [
             "offboard_hover = x650_sim.offboard_hover:main",
+            "end_effector_controller = x650_sim.end_effector_controller:main",
             "manipulator_controller = x650_sim.manipulator_controller:main",
             "camera_bridge = x650_sim.camera_bridge:main",
         ]

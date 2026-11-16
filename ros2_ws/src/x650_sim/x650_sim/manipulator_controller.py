@@ -303,11 +303,15 @@ class ManipulatorController(Node):
                 self.target_x = target_x
                 self.target_z = target_z
             self.get_logger().info(
-                f"Angle target mapped to tip target x={target_x:.3f}, z={target_z:.3f} m"
+                f"Angle target mapped to tip target x={target_x:.3f}, z={target_z:.3f} m",
+                throttle_duration_sec=2.0,
             )
         else:
             self.write_hardware_angle(angle)
-            self.get_logger().info(f"Manipulator target: {angle:.3f} rad")
+            self.get_logger().info(
+                f"Manipulator target: {angle:.3f} rad",
+                throttle_duration_sec=2.0,
+            )
 
     def on_cartesian_target(self, msg: Point) -> None:
         if not all(math.isfinite(value) for value in (msg.x, msg.y, msg.z)):

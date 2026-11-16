@@ -30,6 +30,8 @@ def generate_launch_description() -> LaunchDescription:
     headless = LaunchConfiguration("headless")
     start_agent = LaunchConfiguration("start_agent")
     start_offboard = LaunchConfiguration("start_offboard")
+    start_end_effector_control = LaunchConfiguration("start_end_effector_control")
+    end_effector_auto_arm = LaunchConfiguration("end_effector_auto_arm")
     start_manipulator = LaunchConfiguration("start_manipulator")
     start_camera_bridge = LaunchConfiguration("start_camera_bridge")
     start_gazebo = LaunchConfiguration("start_gazebo")
@@ -125,7 +127,17 @@ def generate_launch_description() -> LaunchDescription:
         executable="offboard_hover",
         name="offboard_hover",
         output="screen",
-        condition=IfCondition(start_offboard),
+        condition=IfCondition(
+            PythonExpression(
+                [
+                    "'",
+                    start_offboard,
+                    "'.lower() == 'true' and '",
+                    start_end_effector_control,
+                    "'.lower() != 'true'",
+                ]
+            )
+        ),
     )
     manipulator = Node(
         package="x650_sim",
@@ -136,7 +148,16 @@ def generate_launch_description() -> LaunchDescription:
             {
                 "mode": "sim",
                 "stabilize_forward": ParameterValue(
-                    manipulator_stabilize_forward, value_type=bool
+                    PythonExpression(
+                        [
+                            "'",
+                            manipulator_stabilize_forward,
+                            "'.lower() == 'true' and '",
+                            start_end_effector_control,
+                            "'.lower() != 'true'",
+                        ]
+                    ),
+                    value_type=bool,
                 ),
                 "stiffness_x": ParameterValue(
                     manipulator_stiffness_x, value_type=float
@@ -149,6 +170,18 @@ def generate_launch_description() -> LaunchDescription:
             }
         ],
         condition=IfCondition(start_manipulator),
+    )
+    end_effector_controller = Node(
+        package="x650_sim",
+        executable="end_effector_controller",
+        name="end_effector_controller",
+        output="screen",
+        parameters=[
+            {
+                "auto_arm": ParameterValue(end_effector_auto_arm, value_type=bool),
+            }
+        ],
+        condition=IfCondition(start_end_effector_control),
     )
     camera_bridge = Node(
         package="x650_sim",
@@ -168,6 +201,16 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("headless", default_value="false"),
             DeclareLaunchArgument("start_agent", default_value="true"),
             DeclareLaunchArgument("start_offboard", default_value="false"),
+            DeclareLaunchArgument(
+                "start_end_effector_control",
+                default_value="false",
+                description="Coordinate PX4 and the arm from a world-frame tool pose",
+            ),
+            DeclareLaunchArgument(
+                "end_effector_auto_arm",
+                default_value="false",
+                description="Allow the end-effector controller to arm PX4",
+            ),
             DeclareLaunchArgument("start_manipulator", default_value="true"),
             DeclareLaunchArgument("start_camera_bridge", default_value="true"),
             DeclareLaunchArgument("manipulator_stiffness_x", default_value="40.0"),
@@ -191,6 +234,7 @@ def generate_launch_description() -> LaunchDescription:
             gazebo_headless,
             px4,
             manipulator,
+            end_effector_controller,
             camera_bridge,
             offboard,
         ]

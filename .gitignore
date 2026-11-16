@@ -19,6 +19,7 @@ rosbag2_*/
 # Local editor and operating-system files
 .vscode/
 .idea/
+*.code-workspace
 .DS_Store
 *~
 

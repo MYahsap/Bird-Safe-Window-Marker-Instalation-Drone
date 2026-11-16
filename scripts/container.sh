@@ -8,6 +8,7 @@ gz_partition="${X650_GZ_PARTITION:-x650_sim}"
 host_display="${DISPLAY:-}"
 host_xauthority="${XAUTHORITY:-}"
 action="${1:-shell}"
+launch_args=("${@:2}")
 
 if command -v podman >/dev/null 2>&1; then
   runtime=podman
@@ -118,10 +119,10 @@ case "$action" in
       echo "No /dev/dri render devices found; Gazebo will use software rendering." >&2
       run_args+=(-e "LIBGL_ALWAYS_SOFTWARE=1")
     fi
-    command=(bash -lc 'source /opt/ros/jazzy/setup.bash && source ros2_ws/install-container/setup.bash && ros2 launch x650_sim sim.launch.py')
+    command=(bash -lc 'source /opt/ros/jazzy/setup.bash && source ros2_ws/install-container/setup.bash && ros2 launch x650_sim sim.launch.py "$@"' bash "${launch_args[@]}")
     ;;
   headless)
-    command=(bash -lc 'source /opt/ros/jazzy/setup.bash && source ros2_ws/install-container/setup.bash && ros2 launch x650_sim sim.launch.py headless:=true')
+    command=(bash -lc 'source /opt/ros/jazzy/setup.bash && source ros2_ws/install-container/setup.bash && ros2 launch x650_sim sim.launch.py headless:=true "$@"' bash "${launch_args[@]}")
     ;;
   check)
     command=(bash -lc 'source /opt/ros/jazzy/setup.bash && source ros2_ws/install-container/setup.bash && ros2 pkg prefix x650_sim && ros2 launch x650_sim sim.launch.py --show-args')
@@ -130,7 +131,7 @@ case "$action" in
     command=(bash -lc 'source /opt/ros/jazzy/setup.bash && source ros2_ws/install-container/setup.bash && ros2 launch x650_sim sim.launch.py headless:=true start_agent:=false')
     ;;
   *)
-    echo "Usage: $0 {shell|build|check|smoke|run|headless}" >&2
+    echo "Usage: $0 {shell|build|check|smoke|run|headless} [launch_arg:=value ...]" >&2
     exit 64
     ;;
 esac
