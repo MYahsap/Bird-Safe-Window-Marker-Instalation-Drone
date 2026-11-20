@@ -492,6 +492,16 @@ Install the pinned QGroundControl AppImage once, then run it on the host:
 Start the simulation first. Because the container uses host networking,
 QGroundControl should discover PX4 automatically on UDP port 14550.
 
+Gazebo Transport is pinned to `127.0.0.1` by default. This prevents an active
+VPN interface (such as Tailscale) from being advertised when the laptop is
+offline, which otherwise leaves Gazebo's GUI blank and prevents PX4 from
+finishing startup. Override it only when Gazebo clients must run on another
+machine:
+
+```bash
+X650_GZ_IP=192.168.1.10 ./scripts/container.sh run
+```
+
 ## Data logging
 
 Record the main ROS 2 data streams from a container shell:
@@ -623,7 +633,8 @@ enter `./scripts/container.sh shell`, which starts Bash.
 The launch file restores PX4 v1.17 multicopter attitude, rate, and position
 defaults and applies the proven `gz_x500` allocation layout. These startup
 overrides prevent experimental values saved in `parameters.bson` from making
-takeoff unstable.
+takeoff unstable. Airborne tilt is limited to ±12°, reducing horizontal
+acceleration during coordinated ROS 2 pose movements.
 
 PX4 allocation uses forward-right-down coordinates, while Gazebo model poses
 use forward-left-up coordinates. The rotor Y signs must therefore be inverted;

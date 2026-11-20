@@ -88,7 +88,10 @@ def generate_launch_description() -> LaunchDescription:
             "PX4_PARAM_MPC_ACC_HOR_MAX": "5.0",
             "PX4_PARAM_MPC_ACC_UP_MAX": "4.0",
             "PX4_PARAM_MPC_ACC_DOWN_MAX": "3.0",
-            "PX4_PARAM_MPC_TILTMAX_AIR": "45.0",
+            # Limit horizontal acceleration during coordinated pose moves.
+            # PX4 interprets this as the maximum absolute airborne tilt, so
+            # the vehicle is constrained to approximately +/-12 degrees.
+            "PX4_PARAM_MPC_TILTMAX_AIR": "12.0",
             "HEADLESS": PythonExpression(
                 ["'1' if '", headless, "'.lower() == 'true' else ''"]
             ),
@@ -97,21 +100,20 @@ def generate_launch_description() -> LaunchDescription:
         },
     )
 
+    # Keep the simulation server independent from the renderer.  Starting both
+    # in one `gz sim` process can prevent the server from advertising its world
+    # when laptop power management stalls GUI/GPU initialization.
+    gazebo_server = ExecuteProcess(
+        cmd=["gz", "sim", "-s", "-r", world_file],
+        output="screen",
+        condition=IfCondition(start_gazebo),
+    )
     gazebo_gui = ExecuteProcess(
-        cmd=["gz", "sim", "-r", world_file],
+        cmd=["gz", "sim", "-g"],
         output="screen",
         condition=IfCondition(
             PythonExpression(
                 ["'", start_gazebo, "'.lower() == 'true' and '", headless, "'.lower() != 'true'"]
-            )
-        ),
-    )
-    gazebo_headless = ExecuteProcess(
-        cmd=["gz", "sim", "-s", "-r", world_file],
-        output="screen",
-        condition=IfCondition(
-            PythonExpression(
-                ["'", start_gazebo, "'.lower() == 'true' and '", headless, "'.lower() == 'true'"]
             )
         ),
     )
@@ -230,8 +232,8 @@ def generate_launch_description() -> LaunchDescription:
             SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", resource_path),
             LogInfo(msg=["X650 Gazebo resources: ", str(share)]),
             agent,
+            gazebo_server,
             gazebo_gui,
-            gazebo_headless,
             px4,
             manipulator,
             end_effector_controller,

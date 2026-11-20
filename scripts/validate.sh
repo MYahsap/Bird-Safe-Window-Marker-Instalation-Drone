@@ -17,6 +17,11 @@ assert 'is_git_checkout "$px4_msgs_path"' in bootstrap_source
 assert 'is_git_checkout "$agent_path"' in bootstrap_source
 print("Bootstrap Git checks OK: normal clones and submodule gitfiles supported")
 
+container_source = (root / "scripts/container.sh").read_text()
+assert 'gz_ip="${X650_GZ_IP:-127.0.0.1}"' in container_source
+assert '-e "GZ_IP=$gz_ip"' in container_source
+print("Container networking OK: Gazebo Transport defaults to host loopback")
+
 xml_files = [
     root / "models/x650/model.config",
     root / "models/x650/model.sdf",
@@ -146,12 +151,16 @@ expected_tuning = {
     '"PX4_PARAM_MC_PITCHRATE_D": "0.003"',
     '"PX4_PARAM_MPC_XY_P": "0.95"',
     '"PX4_PARAM_MPC_Z_P": "1.00"',
+    '"PX4_PARAM_MPC_TILTMAX_AIR": "12.0"',
 }
 missing_tuning = sorted(value for value in expected_tuning if value not in launch_source)
 assert not missing_tuning, missing_tuning
 assert '"start_end_effector_control"' in launch_source
 assert 'executable="end_effector_controller"' in launch_source
-print("PX4 baseline OK: FRD allocation signs and default gains restored")
+assert 'cmd=["gz", "sim", "-s", "-r", world_file]' in launch_source
+assert 'cmd=["gz", "sim", "-g"]' in launch_source
+print("PX4 baseline OK: FRD allocation, default gains, and 12-degree tilt limit")
+print("Gazebo launch OK: server is independent from the optional GUI")
 PY
 
 echo "All offline checks passed."

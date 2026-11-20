@@ -6,6 +6,7 @@ px4_path="${PX4_AUTOPILOT_PATH:-$(dirname "$repo_root")/PX4-Autopilot}"
 image="${X650_CONTAINER_IMAGE:-docker.io/px4io/px4-dev-ros2-gazebo:main-jazzy}"
 container_platform="${X650_CONTAINER_PLATFORM:-}"
 gz_partition="${X650_GZ_PARTITION:-x650_sim}"
+gz_ip="${X650_GZ_IP:-127.0.0.1}"
 host_display="${DISPLAY:-}"
 host_xauthority="${XAUTHORITY:-}"
 action="${1:-shell}"
@@ -65,6 +66,9 @@ run_args=(
   -e "PX4_AUTOPILOT_PATH=/workspace/PX4-Autopilot"
   -e "ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST"
   -e "GZ_PARTITION=$gz_partition"
+  # All Gazebo processes run on the host network. Pin transport to loopback so
+  # it cannot advertise an unreachable VPN/Wi-Fi address while disconnected.
+  -e "GZ_IP=$gz_ip"
   -v "$repo_root:/workspace/sims:rw"
   -v "$px4_path:/workspace/PX4-Autopilot:rw"
   -w /workspace/sims
